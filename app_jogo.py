@@ -1,6 +1,31 @@
 import streamlit as st
+import pandas as pd
+import json
+import os
 
 st.set_page_config(page_title="Jogo ao Vivo", layout="wide")
+
+ARQUIVO_JOGO = "jogo_atual.json"
+
+# =====================
+# SALVAR / CARREGAR
+# =====================
+def salvar_jogo():
+    dados = {
+        "time_a": st.session_state.time_a,
+        "time_b": st.session_state.time_b,
+        "eventos": st.session_state.eventos
+    }
+    with open(ARQUIVO_JOGO, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False)
+
+def carregar_jogo():
+    if os.path.exists(ARQUIVO_JOGO):
+        with open(ARQUIVO_JOGO, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+            st.session_state.time_a = dados["time_a"]
+            st.session_state.time_b = dados["time_b"]
+            st.session_state.eventos = dados.get("eventos", [])
 
 # =====================
 # FUNÇÕES
@@ -12,96 +37,46 @@ def criar_time(nome, jogadores):
         "placar": 0
     }
 
-import pandas as pd
-
 def tabela(time):
     dados = []
-
     for jogador, v in time["jogadores"].items():
         dados.append({
             "Jogadores": jogador,
             "⚽": v["g"],
             "👟": v["a"]
         })
+    st.dataframe(pd.DataFrame(dados), hide_index=True, use_container_width=True)
 
-    df = pd.DataFrame(dados)
+def aplicar_evento(evento, remover=False):
+    time = st.session_state.time_a if evento["time"] == "A" else st.session_state.time_b
+    fator = -1 if remover else 1
 
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True
-    )
+    time["placar"] += fator
+    time["jogadores"][evento["autor"]]["g"] += fator
 
- 
+    if evento["assist"]:
+        time["jogadores"][evento["assist"]]["a"] += fator
 
 # =====================
 # ESTADO INICIAL
 # =====================
 if "time_a" not in st.session_state:
+    carregar_jogo()
+
+if "time_a" not in st.session_state:
     st.session_state.time_a = criar_time(
-        "Alyson",
-        ["Alyson", "Artur", "Erick", "Rafa", "Vitão", "Gabriel", "Arthur"]
+        "Branco",
+        ["Jessé G", "Alyson","Artur", "Erik T.", "Miguel", "Gabriel", "Gege"]
     )
 
 if "time_b" not in st.session_state:
     st.session_state.time_b = criar_time(
-        "Kadoya",
-        ["Kadoya", "Wagner", "Miguel", "Kadu", "Gege", "Jessé", "Erick Cei"]
+        "Azul",
+        ["Edilso G","Kadoya", "Wagner", "Erick", "Rafa", "Kadu", "Vitão"]
     )
 
-# =====================
-# CONFIGURAÇÃO
-# =====================
-with st.expander("⚙️ Configuração do jogo"):
-    c1, c2 = st.columns(2)
-
-    with c1:
-        st.subheader("Time A")
-        st.session_state.time_a["nome"] = st.text_input(
-            "Nome do time",
-            st.session_state.time_a["nome"],
-            key="nome_a"
-        )
-
-        novo = st.text_input("Adicionar jogador", key="novo_a")
-        if st.button("Adicionar", key="add_a"):
-            if novo:
-                st.session_state.time_a["jogadores"][novo] = {"g": 0, "a": 0}
-                st.rerun()
-
-        if st.session_state.time_a["jogadores"]:
-            rem = st.selectbox(
-                "Remover jogador",
-                list(st.session_state.time_a["jogadores"].keys()),
-                key="rem_a"
-            )
-            if st.button("Remover", key="del_a"):
-                del st.session_state.time_a["jogadores"][rem]
-                st.rerun()
-
-    with c2:
-        st.subheader("Time B")
-        st.session_state.time_b["nome"] = st.text_input(
-            "Nome do time",
-            st.session_state.time_b["nome"],
-            key="nome_b"
-        )
-
-        novo = st.text_input("Adicionar jogador", key="novo_b")
-        if st.button("Adicionar", key="add_b"):
-            if novo:
-                st.session_state.time_b["jogadores"][novo] = {"g": 0, "a": 0}
-                st.rerun()
-
-        if st.session_state.time_b["jogadores"]:
-            rem = st.selectbox(
-                "Remover jogador",
-                list(st.session_state.time_b["jogadores"].keys()),
-                key="rem_b"
-            )
-            if st.button("Remover", key="del_b"):
-                del st.session_state.time_b["jogadores"][rem]
-                st.rerun()
+if "eventos" not in st.session_state:
+    st.session_state.eventos = []
 
 # =====================
 # PLACAR
@@ -110,7 +85,7 @@ st.markdown(
     f"""
     <h2 style="text-align:center">
         {st.session_state.time_a['nome']}
-        &nbsp; {st.session_state.time_a['placar']} x {st.session_state.time_b['placar']} &nbsp;
+        {st.session_state.time_a['placar']} x {st.session_state.time_b['placar']}
         {st.session_state.time_b['nome']}
     </h2>
     """,
@@ -125,41 +100,66 @@ st.divider()
 @st.dialog("Gol - Time A")
 def gol_time_a():
     jogadores = list(st.session_state.time_a["jogadores"].keys())
-    autor = st.selectbox("⚽ Quem fez o gol?", jogadores)
-    assist = st.selectbox("👟 Assistência", ["Sem assistência"] + jogadores)
+    autor = st.selectbox("⚽ Gol", jogadores)
+    assist = st.selectbox("👟 Assistência", ["Nenhuma"] + jogadores)
 
-    if st.button("Confirmar Gol", use_container_width=True):
-        st.session_state.time_a["placar"] += 1
-        st.session_state.time_a["jogadores"][autor]["g"] += 1
-        if assist != "Sem assistência" and assist != autor:
-            st.session_state.time_a["jogadores"][assist]["a"] += 1
+    if st.button("Confirmar"):
+        evento = {
+            "time": "A",
+            "autor": autor,
+            "assist": None if assist == "Nenhuma" else assist
+        }
+        st.session_state.eventos.append(evento)
+        aplicar_evento(evento)
+        salvar_jogo()
         st.rerun()
 
 @st.dialog("Gol - Time B")
 def gol_time_b():
     jogadores = list(st.session_state.time_b["jogadores"].keys())
-    autor = st.selectbox("⚽ Quem fez o gol?", jogadores)
-    assist = st.selectbox("👟 Assistência", ["Sem assistência"] + jogadores)
+    autor = st.selectbox("⚽ Gol", jogadores)
+    assist = st.selectbox("👟 Assistência", ["Nenhuma"] + jogadores)
 
-    if st.button("Confirmar Gol", use_container_width=True):
-        st.session_state.time_b["placar"] += 1
-        st.session_state.time_b["jogadores"][autor]["g"] += 1
-        if assist != "Sem assistência" and assist != autor:
-            st.session_state.time_b["jogadores"][assist]["a"] += 1
+    if st.button("Confirmar"):
+        evento = {
+            "time": "B",
+            "autor": autor,
+            "assist": None if assist == "Nenhuma" else assist
+        }
+        st.session_state.eventos.append(evento)
+        aplicar_evento(evento)
+        salvar_jogo()
         st.rerun()
 
-# =====================
-# BOTÕES DE GOL
-# =====================
-b1, b2 = st.columns(2)
-
-with b1:
-    if st.button(f"⚽ Gol {st.session_state.time_a['nome']}", use_container_width=True):
+c1, c2 = st.columns(2)
+with c1:
+    if st.button("⚽ Gol Time A", use_container_width=True):
         gol_time_a()
-
-with b2:
-    if st.button(f"⚽ Gol {st.session_state.time_b['nome']}", use_container_width=True):
+with c2:
+    if st.button("⚽ Gol Time B", use_container_width=True):
         gol_time_b()
+
+st.divider()
+
+# =====================
+# HISTÓRICO DE GOLS
+# =====================
+st.subheader("📋 Histórico de gols")
+
+for i, e in enumerate(st.session_state.eventos):
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+
+    time_nome = st.session_state.time_a["nome"] if e["time"] == "A" else st.session_state.time_b["nome"]
+
+    col1.write(time_nome)
+    col2.write(f"⚽ {e['autor']}")
+    col3.write(f"👟 {e['assist'] or '-'}")
+
+    if col4.button("❌", key=f"del_{i}"):
+        aplicar_evento(e, remover=True)
+        st.session_state.eventos.pop(i)
+        salvar_jogo()
+        st.rerun()
 
 st.divider()
 
@@ -167,11 +167,9 @@ st.divider()
 # TABELAS
 # =====================
 c1, c2 = st.columns(2)
-
 with c1:
     st.subheader(st.session_state.time_a["nome"])
     tabela(st.session_state.time_a)
-
 with c2:
     st.subheader(st.session_state.time_b["nome"])
     tabela(st.session_state.time_b)
