@@ -1,175 +1,194 @@
 import streamlit as st
-import pandas as pd
 import json
 import os
+import urllib.parse
 
 st.set_page_config(page_title="Jogo ao Vivo", layout="wide")
 
 ARQUIVO_JOGO = "jogo_atual.json"
+ARQUIVO_HISTORICO = "historico_jogos.json"
 
-# =====================
-# SALVAR / CARREGAR
-# =====================
-def salvar_jogo():
-    dados = {
-        "time_a": st.session_state.time_a,
-        "time_b": st.session_state.time_b,
-        "eventos": st.session_state.eventos
-    }
-    with open(ARQUIVO_JOGO, "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False)
-
+# -------------------------
+# FUNÇÕES
+# -------------------------
 def carregar_jogo():
     if os.path.exists(ARQUIVO_JOGO):
         with open(ARQUIVO_JOGO, "r", encoding="utf-8") as f:
-            dados = json.load(f)
-            st.session_state.time_a = dados["time_a"]
-            st.session_state.time_b = dados["time_b"]
-            st.session_state.eventos = dados.get("eventos", [])
+            return json.load(f)
+    return None
 
-# =====================
-# FUNÇÕES
-# =====================
-def criar_time(nome, jogadores):
-    return {
-        "nome": nome,
-        "jogadores": {j: {"g": 0, "a": 0} for j in jogadores},
-        "placar": 0
+
+def salvar_jogo():
+    jogo = {
+        "time_a": st.session_state.time_a,
+        "time_b": st.session_state.time_b,
+        "eventos": st.session_state.eventos,
+    }
+    with open(ARQUIVO_JOGO, "w", encoding="utf-8") as f:
+        json.dump(jogo, f, ensure_ascii=False)
+
+
+def gerar_resumo():
+    linhas = []
+    linhas.append(
+        f"{st.session_state.time_a['nome']} "
+        f"{st.session_state.time_a['placar']} x "
+        f"{st.session_state.time_b['placar']} "
+        f"{st.session_state.time_b['nome']}"
+    )
+    linhas.append("")
+    linhas.append("⚽ Gols e Assistências:")
+
+    for e in st.session_state.eventos:
+        time_nome = (
+            st.session_state.time_a["nome"]
+            if e["time"] == "A"
+            else st.session_state.time_b["nome"]
+        )
+        linha = f"- {time_nome}: {e['autor']}"
+        if e["assist"]:
+            linha += f" (assist: {e['assist']})"
+        linhas.append(linha)
+
+    return "\n".join(linhas)
+
+
+def salvar_historico():
+    jogo = {
+        "resumo": gerar_resumo(),
+        "time_a": st.session_state.time_a,
+        "time_b": st.session_state.time_b,
+        "eventos": st.session_state.eventos,
     }
 
-def tabela(time):
-    dados = []
-    for jogador, v in time["jogadores"].items():
-        dados.append({
-            "Jogadores": jogador,
-            "⚽": v["g"],
-            "👟": v["a"]
-        })
-    st.dataframe(pd.DataFrame(dados), hide_index=True, use_container_width=True)
+    historico = []
+    if os.path.exists(ARQUIVO_HISTORICO):
+        with open(ARQUIVO_HISTORICO, "r", encoding="utf-8") as f:
+            historico = json.load(f)
 
-def aplicar_evento(evento, remover=False):
-    time = st.session_state.time_a if evento["time"] == "A" else st.session_state.time_b
-    fator = -1 if remover else 1
+    historico.append(jogo)
 
-    time["placar"] += fator
-    time["jogadores"][evento["autor"]]["g"] += fator
+    with open(ARQUIVO_HISTORICO, "w", encoding="utf-8") as f:
+        json.dump(historico, f, ensure_ascii=False)
 
-    if evento["assist"]:
-        time["jogadores"][evento["assist"]]["a"] += fator
 
-# =====================
+# -------------------------
 # ESTADO INICIAL
-# =====================
+# -------------------------
 if "time_a" not in st.session_state:
-    carregar_jogo()
+    jogo = carregar_jogo()
+    if jogo:
+        st.session_state.time_a = jogo["time_a"]
+        st.session_state.time_b = jogo["time_b"]
+        st.session_state.eventos = jogo["eventos"]
+    else:
+        st.session_state.time_a = {
+            "nome": "Branco",
+            "placar": 0,
+            "jogadores": ["Alyson", "Artur", "João", "Pedro", "Lucas", "Rafa", "Diego"],
+        }
+        st.session_state.time_b = {
+            "nome": "Azul",
+            "placar": 0,
+            "jogadores": ["Kadoya", "Bruno", "Matheus", "Igor", "Felipe", "Leo", "Caio"],
+        }
+        st.session_state.eventos = []
 
-if "time_a" not in st.session_state:
-    st.session_state.time_a = criar_time(
-        "Branco",
-        ["Jessé G", "Alyson","Artur", "Erik T.", "Miguel", "Gabriel", "Gege"]
-    )
+# -------------------------
+# TOPO
+# -------------------------
+st.title("⚽ Jogo ao Vivo")
 
-if "time_b" not in st.session_state:
-    st.session_state.time_b = criar_time(
-        "Azul",
-        ["Edilso G","Kadoya", "Wagner", "Erick", "Rafa", "Kadu", "Vitão"]
-    )
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader(st.session_state.time_a["nome"])
+    st.markdown(f"## {st.session_state.time_a['placar']}")
 
-if "eventos" not in st.session_state:
-    st.session_state.eventos = []
+with col2:
+    st.subheader(st.session_state.time_b["nome"])
+    st.markdown(f"## {st.session_state.time_b['placar']}")
 
-# =====================
-# PLACAR
-# =====================
-st.markdown(
-    f"""
-    <h2 style="text-align:center">
-        {st.session_state.time_a['nome']}
-        {st.session_state.time_a['placar']} x {st.session_state.time_b['placar']}
-        {st.session_state.time_b['nome']}
-    </h2>
-    """,
-    unsafe_allow_html=True
+# -------------------------
+# MARCAR GOL
+# -------------------------
+st.divider()
+st.subheader("➕ Marcar Gol")
+
+time = st.radio("Time", ["A", "B"], horizontal=True)
+
+time_data = (
+    st.session_state.time_a if time == "A" else st.session_state.time_b
 )
 
+autor = st.selectbox("⚽ Gol de", time_data["jogadores"])
+assist = st.selectbox(
+    "👟 Assistência",
+    [""] + [j for j in time_data["jogadores"] if j != autor],
+)
+
+if st.button("Registrar Gol"):
+    evento = {
+        "time": time,
+        "autor": autor,
+        "assist": assist,
+    }
+    st.session_state.eventos.append(evento)
+
+    if time == "A":
+        st.session_state.time_a["placar"] += 1
+    else:
+        st.session_state.time_b["placar"] += 1
+
+    salvar_jogo()
+    st.rerun()
+
+# -------------------------
+# EVENTOS
+# -------------------------
 st.divider()
-
-# =====================
-# MODAIS DE GOL
-# =====================
-@st.dialog("Gol - Time A")
-def gol_time_a():
-    jogadores = list(st.session_state.time_a["jogadores"].keys())
-    autor = st.selectbox("⚽ Gol", jogadores)
-    assist = st.selectbox("👟 Assistência", ["Nenhuma"] + jogadores)
-
-    if st.button("Confirmar"):
-        evento = {
-            "time": "A",
-            "autor": autor,
-            "assist": None if assist == "Nenhuma" else assist
-        }
-        st.session_state.eventos.append(evento)
-        aplicar_evento(evento)
-        salvar_jogo()
-        st.rerun()
-
-@st.dialog("Gol - Time B")
-def gol_time_b():
-    jogadores = list(st.session_state.time_b["jogadores"].keys())
-    autor = st.selectbox("⚽ Gol", jogadores)
-    assist = st.selectbox("👟 Assistência", ["Nenhuma"] + jogadores)
-
-    if st.button("Confirmar"):
-        evento = {
-            "time": "B",
-            "autor": autor,
-            "assist": None if assist == "Nenhuma" else assist
-        }
-        st.session_state.eventos.append(evento)
-        aplicar_evento(evento)
-        salvar_jogo()
-        st.rerun()
-
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("⚽ Gol Time A", use_container_width=True):
-        gol_time_a()
-with c2:
-    if st.button("⚽ Gol Time B", use_container_width=True):
-        gol_time_b()
-
-st.divider()
-
-# =====================
-# HISTÓRICO DE GOLS
-# =====================
-st.subheader("📋 Histórico de gols")
+st.subheader("📋 Gols Registrados")
 
 for i, e in enumerate(st.session_state.eventos):
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+    time_nome = (
+        st.session_state.time_a["nome"]
+        if e["time"] == "A"
+        else st.session_state.time_b["nome"]
+    )
 
-    time_nome = st.session_state.time_a["nome"] if e["time"] == "A" else st.session_state.time_b["nome"]
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        txt = f"{time_nome} - {e['autor']}"
+        if e["assist"]:
+            txt += f" (assist: {e['assist']})"
+        st.write(txt)
 
-    col1.write(time_nome)
-    col2.write(f"⚽ {e['autor']}")
-    col3.write(f"👟 {e['assist'] or '-'}")
+    with col2:
+        if st.button("❌", key=f"del_{i}"):
+            if e["time"] == "A":
+                st.session_state.time_a["placar"] -= 1
+            else:
+                st.session_state.time_b["placar"] -= 1
 
-    if col4.button("❌", key=f"del_{i}"):
-        aplicar_evento(e, remover=True)
-        st.session_state.eventos.pop(i)
-        salvar_jogo()
-        st.rerun()
+            st.session_state.eventos.pop(i)
+            salvar_jogo()
+            st.rerun()
 
+# -------------------------
+# FINALIZAR JOGO
+# -------------------------
 st.divider()
+st.subheader("🏁 Finalizar Jogo")
 
-# =====================
-# TABELAS
-# =====================
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader(st.session_state.time_a["nome"])
-    tabela(st.session_state.time_a)
-with c2:
-    st.subheader(st.session_state.time_b["nome"])
-    tabela(st.session_state.time_b)
+resumo = gerar_resumo()
+st.text_area("Resumo", resumo, height=180)
+
+msg = urllib.parse.quote(resumo)
+link_whats = f"https://wa.me/?text={msg}"
+st.markdown(f"📤 [Enviar para WhatsApp]({link_whats})")
+
+if st.button("Salvar jogo e iniciar novo"):
+    salvar_historico()
+    if os.path.exists(ARQUIVO_JOGO):
+        os.remove(ARQUIVO_JOGO)
+    st.session_state.clear()
+    st.rerun()
