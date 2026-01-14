@@ -150,6 +150,19 @@ with c2:
 
 st.divider()
 
+
+
+# =====================
+# TABELAS
+# =====================
+c1, c2 = st.columns(2)
+with c1:
+    st.subheader(st.session_state.time_a["nome"])
+    tabela(st.session_state.time_a)
+with c2:
+    st.subheader(st.session_state.time_b["nome"])
+    tabela(st.session_state.time_b)
+
 # =====================
 # HISTÓRICO DE GOLS
 # =====================
@@ -173,17 +186,6 @@ for i, e in enumerate(st.session_state.eventos):
 st.divider()
 
 # =====================
-# TABELAS
-# =====================
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader(st.session_state.time_a["nome"])
-    tabela(st.session_state.time_a)
-with c2:
-    st.subheader(st.session_state.time_b["nome"])
-    tabela(st.session_state.time_b)
-
-# =====================
 # RESET COM CONFIRMAÇÃO
 # =====================
 st.divider()
@@ -204,3 +206,60 @@ else:
     with c2:
         if st.button("❌ Cancelar"):
             st.session_state.confirmar_reset = False
+
+# =====================
+# CONFIGURAÇÕES DO JOGO
+# =====================
+st.divider()
+st.subheader("⚙️ Configurações do jogo")
+
+def config_time(time_key, time_label):
+    time = st.session_state[time_key]
+
+    st.markdown(f"### {time_label}")
+
+    # Alterar nome do time
+    novo_nome = st.text_input(
+        "Nome do time",
+        value=time["nome"],
+        key=f"nome_{time_key}"
+    )
+
+    if novo_nome != time["nome"]:
+        time["nome"] = novo_nome
+        salvar_jogo()
+
+    # Adicionar jogador
+    novo_jogador = st.text_input(
+        "Adicionar jogador",
+        key=f"add_{time_key}"
+    )
+
+    if st.button("➕ Adicionar", key=f"btn_add_{time_key}") and novo_jogador:
+        if novo_jogador not in time["jogadores"]:
+            time["jogadores"][novo_jogador] = {"g": 0, "a": 0}
+            salvar_jogo()
+            st.rerun()
+
+    st.markdown("**Jogadores:**")
+
+    for jogador, v in list(time["jogadores"].items()):
+        c1, c2 = st.columns([4, 1])
+        c1.write(jogador)
+
+        # Só permite remover se não tiver stats
+        if v["g"] == 0 and v["a"] == 0:
+            if c2.button("❌", key=f"rem_{time_key}_{jogador}"):
+                del time["jogadores"][jogador]
+                salvar_jogo()
+                st.rerun()
+        else:
+            c2.write("🔒")
+
+# Configuração dos dois times
+c1, c2 = st.columns(2)
+with c1:
+    config_time("time_a", "Time A")
+with c2:
+    config_time("time_b", "Time B")
+
