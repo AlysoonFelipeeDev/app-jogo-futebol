@@ -75,13 +75,13 @@ if "time_a" not in st.session_state:
 if "time_a" not in st.session_state:
     st.session_state.time_a = criar_time(
         "Alyson",
-        ["Alyson", "Artur", "Erick", "Rafa", "Vitão", "Gabriel", "Arthur"]
+        ["Jessé G", "Alyson", "Artur", "Erik T.", "Miguel", "Gabriel", "Gege"]
     )
 
 if "time_b" not in st.session_state:
     st.session_state.time_b = criar_time(
         "Kadoya",
-        ["Kadoya", "Wagner", "Miguel", "Kadu", "Gege", "Jessé", "Erick Cei"]
+        ["Edilson G.","E. Kadoya", "Wagner", "Erick", "Kadu", "Rafa", "Vitão"]
     )
 
 if "eventos" not in st.session_state:
@@ -142,10 +142,10 @@ def gol_time_b():
 
 c1, c2 = st.columns(2)
 with c1:
-    if st.button("⚽ Gol Time A", use_container_width=True):
+    if st.button(f"⚽ Gol {st.session_state.time_a['nome']}", use_container_width=True):
         gol_time_a()
 with c2:
-    if st.button("⚽ Gol Time B", use_container_width=True):
+    if st.button(f"⚽ Gol {st.session_state.time_b['nome']}", use_container_width=True):
         gol_time_b()
 
 st.divider()
