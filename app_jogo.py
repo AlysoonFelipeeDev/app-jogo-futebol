@@ -74,13 +74,13 @@ if "time_a" not in st.session_state:
 
 if "time_a" not in st.session_state:
     st.session_state.time_a = criar_time(
-        "Alyson",
+        "Branco",
         ["Jessé G", "Alyson", "Artur", "Erik T.", "Miguel", "Gabriel", "Gege"]
     )
 
 if "time_b" not in st.session_state:
     st.session_state.time_b = criar_time(
-        "Kadoya",
+        "Azul",
         ["Edilson G.","E. Kadoya", "Wagner", "Erick", "Kadu", "Rafa", "Vitão"]
     )
 
